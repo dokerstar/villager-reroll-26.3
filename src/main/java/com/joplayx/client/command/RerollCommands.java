@@ -1,5 +1,6 @@
 package com.joplayx.client.command;
 
+import com.joplayx.client.Texts;
 import com.joplayx.client.VillagerRerollClient;
 import com.joplayx.client.config.EnchantTargetListScreen;
 import com.joplayx.client.config.RerollerConfig;
@@ -7,6 +8,7 @@ import com.joplayx.client.config.RerollerConfig.Config;
 import com.joplayx.client.config.RerollerConfig.EnchantTarget;
 import com.joplayx.client.config.RerollerConfig.HudCorner;
 import com.joplayx.client.config.RerollerConfigScreen;
+import com.joplayx.client.state.RerollState;
 import com.joplayx.client.util.HotbarUtil;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
@@ -21,6 +23,7 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.IdentifierArgument;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.npc.villager.Villager;
 
@@ -36,8 +39,6 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
  * are handled entirely on this client and never sent to the server.
  */
 public final class RerollCommands {
-
-	private static final String PREFIX = "[Reroller] ";
 
 	private RerollCommands() {}
 
@@ -60,7 +61,7 @@ public final class RerollCommands {
 						.then(literal("clear").executes(ctx -> {
 							RerollerConfig.get().clearLecternPos();
 							RerollerConfig.save();
-							return say(ctx, PREFIX + "Lectern position cleared.");
+							return say(ctx, Texts.prefixed("command.villager-reroll.pos_cleared"));
 						}))
 						.then(argument("x", IntegerArgumentType.integer())
 								.then(argument("y", IntegerArgumentType.integer())
@@ -71,7 +72,7 @@ public final class RerollCommands {
 						.executes(ctx -> say(ctx, VillagerRerollClient.selectVillagerFromCrosshair(ctx.getSource().getClient())))
 						.then(literal("clear").executes(ctx -> {
 							VillagerRerollClient.CONTROLLER.clearSelectedVillager();
-							return say(ctx, PREFIX + "Villager selection cleared - nearest villager will be used.");
+							return say(ctx, Texts.prefixed("command.villager-reroll.villager_cleared"));
 						})))
 
 				.then(literal("add")
@@ -92,7 +93,7 @@ public final class RerollCommands {
 				.then(literal("clear").executes(ctx -> {
 					RerollerConfig.get().targets.clear();
 					RerollerConfig.save();
-					return say(ctx, PREFIX + "Target list cleared.");
+					return say(ctx, Texts.prefixed("command.villager-reroll.targets_cleared"));
 				}))
 
 				.then(literal("hud")
@@ -102,14 +103,14 @@ public final class RerollCommands {
 								.then(argument("enabled", BoolArgumentType.bool()).executes(ctx -> {
 									RerollerConfig.get().hudCompact = BoolArgumentType.getBool(ctx, "enabled");
 									RerollerConfig.save();
-									return say(ctx, PREFIX + "HUD compact mode: " + onOff(RerollerConfig.get().hudCompact));
+									return say(ctx, Texts.prefixed("command.villager-reroll.hud_compact", onOff(RerollerConfig.get().hudCompact)));
 								})))
 						.then(literal("scale")
 								.then(argument("scale", FloatArgumentType.floatArg(
 										RerollerConfig.MIN_HUD_SCALE, RerollerConfig.MAX_HUD_SCALE)).executes(ctx -> {
 									RerollerConfig.get().hudScale = FloatArgumentType.getFloat(ctx, "scale");
 									RerollerConfig.save();
-									return say(ctx, PREFIX + "HUD scale: " + RerollerConfig.get().hudScale);
+									return say(ctx, Texts.prefixed("command.villager-reroll.hud_scale", RerollerConfig.get().hudScale));
 								})))
 						.then(literal("pos")
 								.then(argument("corner", com.mojang.brigadier.arguments.StringArgumentType.word())
@@ -121,34 +122,34 @@ public final class RerollCommands {
 								.then(argument("ticks", IntegerArgumentType.integer(5, 100)).executes(ctx -> {
 									RerollerConfig.get().closeDelayTicks = IntegerArgumentType.getInteger(ctx, "ticks");
 									RerollerConfig.save();
-									return say(ctx, PREFIX + "Close delay: " + RerollerConfig.get().closeDelayTicks + " ticks");
+									return say(ctx, Texts.prefixed("command.villager-reroll.close_delay", RerollerConfig.get().closeDelayTicks));
 								})))
 						.then(literal("retry")
 								.then(argument("ticks", IntegerArgumentType.integer(10, 200)).executes(ctx -> {
 									RerollerConfig.get().retryDelayTicks = IntegerArgumentType.getInteger(ctx, "ticks");
 									RerollerConfig.save();
-									return say(ctx, PREFIX + "Retry delay: " + RerollerConfig.get().retryDelayTicks + " ticks");
+									return say(ctx, Texts.prefixed("command.villager-reroll.retry_delay", RerollerConfig.get().retryDelayTicks));
 								}))))
 
 				.then(literal("radius")
 						.then(argument("blocks", IntegerArgumentType.integer(1, 16)).executes(ctx -> {
 							RerollerConfig.get().searchRadius = IntegerArgumentType.getInteger(ctx, "blocks");
 							RerollerConfig.save();
-							return say(ctx, PREFIX + "Villager search radius: " + RerollerConfig.get().searchRadius + " blocks");
+							return say(ctx, Texts.prefixed("command.villager-reroll.radius", RerollerConfig.get().searchRadius));
 						})))
 
 				.then(literal("highlight")
 						.then(argument("enabled", BoolArgumentType.bool()).executes(ctx -> {
 							RerollerConfig.get().highlightVillager = BoolArgumentType.getBool(ctx, "enabled");
 							RerollerConfig.save();
-							return say(ctx, PREFIX + "Selected villager outline: " + onOff(RerollerConfig.get().highlightVillager));
+							return say(ctx, Texts.prefixed("command.villager-reroll.highlight", onOff(RerollerConfig.get().highlightVillager)));
 						})))
 
 				.then(literal("pickup")
 						.then(argument("enabled", BoolArgumentType.bool()).executes(ctx -> {
 							RerollerConfig.get().autoPickup = BoolArgumentType.getBool(ctx, "enabled");
 							RerollerConfig.save();
-							return say(ctx, PREFIX + "Walk to pick up dropped lectern: " + onOff(RerollerConfig.get().autoPickup));
+							return say(ctx, Texts.prefixed("command.villager-reroll.pickup", onOff(RerollerConfig.get().autoPickup)));
 						})))
 
 				.then(literal("settings").executes(RerollCommands::showSettings))
@@ -166,8 +167,6 @@ public final class RerollCommands {
 				.then(literal("debug").executes(RerollCommands::debug))
 		);
 	}
-
-	// ---------------------------------------------------------------- suggestions
 
 	private static final SuggestionProvider<FabricClientCommandSource> ENCHANT_SUGGESTIONS = (ctx, builder) -> {
 		Minecraft mc = ctx.getSource().getClient();
@@ -192,20 +191,8 @@ public final class RerollCommands {
 			SharedSuggestionProvider.suggest(
 					Arrays.stream(HudCorner.values()).map(c -> c.name().toLowerCase(Locale.ROOT)), builder);
 
-	// ---------------------------------------------------------------- handlers
-
 	private static int help(CommandContext<FabricClientCommandSource> ctx) {
-		return say(ctx, String.join("\n",
-				PREFIX + "Client-side commands (never sent to the server):",
-				"/reroll start | stop",
-				"/reroll pos [x y z | clear]  - lectern spot (no args = where you look)",
-				"/reroll villager [clear]  - select the villager you look at",
-				"/reroll add <enchant> [minLevel] [maxCost]",
-				"/reroll remove <enchant> | list | clear",
-				"/reroll hud on|off | scale <0.5-2> | pos <corner> | compact <true|false>",
-				"/reroll delay close|retry <ticks> | radius <blocks> | highlight <true|false>",
-				"/reroll pickup <true|false>  - walk to a dropped lectern and back",
-				"/reroll settings | config [more] | debug"));
+		return say(ctx, Texts.prefixed("command.villager-reroll.help"));
 	}
 
 	private static int setPos(CommandContext<FabricClientCommandSource> ctx) {
@@ -214,7 +201,7 @@ public final class RerollCommands {
 		cfg.lecternY = IntegerArgumentType.getInteger(ctx, "y");
 		cfg.lecternZ = IntegerArgumentType.getInteger(ctx, "z");
 		RerollerConfig.save();
-		return say(ctx, PREFIX + "Lectern position set to " + cfg.lecternPosString());
+		return say(ctx, Texts.prefixed("command.villager-reroll.pos_set", cfg.lecternPosString()));
 	}
 
 	private static int addTarget(CommandContext<FabricClientCommandSource> ctx, int minLevel, int maxCost) {
@@ -222,7 +209,7 @@ public final class RerollCommands {
 		Minecraft mc = ctx.getSource().getClient();
 		if (mc.level != null && mc.level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
 				.listElements().noneMatch(ref -> ref.key().identifier().equals(id))) {
-			ctx.getSource().sendError(Component.literal(PREFIX + "Unknown enchantment: " + id));
+			ctx.getSource().sendError(Texts.prefixed("command.villager-reroll.unknown_enchant", id));
 			return 0;
 		}
 		String idString = id.toString();
@@ -237,37 +224,39 @@ public final class RerollCommands {
 			targets.add(new EnchantTarget(idString, minLevel, maxCost));
 		}
 		RerollerConfig.save();
-		return say(ctx, PREFIX + (existing != null ? "Updated " : "Added ")
-				+ idString + " (level " + minLevel + "+, max " + maxCost + " emeralds)");
+		return say(ctx, Texts.prefixed(
+				existing != null ? "command.villager-reroll.updated" : "command.villager-reroll.added",
+				idString, minLevel, maxCost));
 	}
 
 	private static int removeTarget(CommandContext<FabricClientCommandSource> ctx) {
 		String id = ctx.getArgument("enchant", Identifier.class).toString();
 		boolean removed = RerollerConfig.get().targets.removeIf(t -> t.enchantmentId.equals(id));
 		if (!removed) {
-			ctx.getSource().sendError(Component.literal(PREFIX + id + " is not in the target list."));
+			ctx.getSource().sendError(Texts.prefixed("command.villager-reroll.not_in_list", id));
 			return 0;
 		}
 		RerollerConfig.save();
-		return say(ctx, PREFIX + "Removed " + id);
+		return say(ctx, Texts.prefixed("command.villager-reroll.removed", id));
 	}
 
 	private static int listTargets(CommandContext<FabricClientCommandSource> ctx) {
 		List<EnchantTarget> targets = RerollerConfig.get().targets;
-		if (targets.isEmpty()) return say(ctx, PREFIX + "Target list is empty. Add one with /reroll add <enchant>.");
-		StringBuilder sb = new StringBuilder(PREFIX + "Targets:");
-		for (EnchantTarget t : targets) {
-			sb.append("\n- ").append(t.enchantmentId)
-					.append("  level ").append(t.minLevel).append("+")
-					.append(", max ").append(t.maxEmeraldCost).append(" emeralds");
+		if (targets.isEmpty()) return say(ctx, Texts.prefixed("command.villager-reroll.list_empty"));
+		MutableComponent message = Texts.tr("message.villager-reroll.prefix")
+				.append(Texts.tr("command.villager-reroll.list_header"));
+		for (EnchantTarget target : targets) {
+			message.append("\n").append(Texts.tr(
+					"command.villager-reroll.list_line",
+					target.enchantmentId, target.minLevel, target.maxEmeraldCost));
 		}
-		return say(ctx, sb.toString());
+		return say(ctx, message);
 	}
 
 	private static int setHud(CommandContext<FabricClientCommandSource> ctx, boolean enabled) {
 		RerollerConfig.get().hudEnabled = enabled;
 		RerollerConfig.save();
-		return say(ctx, PREFIX + "HUD: " + onOff(enabled));
+		return say(ctx, Texts.prefixed("command.villager-reroll.hud", onOff(enabled)));
 	}
 
 	private static int setCorner(CommandContext<FabricClientCommandSource> ctx) {
@@ -276,56 +265,73 @@ public final class RerollCommands {
 		try {
 			corner = HudCorner.valueOf(raw.toUpperCase(Locale.ROOT));
 		} catch (IllegalArgumentException e) {
-			ctx.getSource().sendError(Component.literal(PREFIX + "Unknown corner: " + raw));
+			ctx.getSource().sendError(Texts.prefixed("command.villager-reroll.unknown_corner", raw));
 			return 0;
 		}
 		RerollerConfig.get().hudCorner = corner;
 		RerollerConfig.save();
-		return say(ctx, PREFIX + "HUD position: " + corner.name().toLowerCase(Locale.ROOT));
+		return say(ctx, Texts.prefixed("command.villager-reroll.hud_pos", cornerName(corner), raw.toLowerCase(Locale.ROOT)));
 	}
 
 	private static int showSettings(CommandContext<FabricClientCommandSource> ctx) {
 		Config cfg = RerollerConfig.get();
-		return say(ctx, String.join("\n",
-				PREFIX + "Current settings (default in brackets):",
-				"Lectern: " + cfg.lecternPosString() + "  [not set]",
-				"Targets: " + cfg.targets.size() + "  [0]",
-				"Close delay: " + cfg.closeDelayTicks + " ticks  [20]",
-				"Retry delay: " + cfg.retryDelayTicks + " ticks  [40]",
-				"Search radius: " + cfg.searchRadius + " blocks  [6]",
-				"Villager outline: " + onOff(cfg.highlightVillager) + "  [on]",
-				"Auto pickup walk: " + onOff(cfg.autoPickup) + "  [on]",
-				"HUD: " + onOff(cfg.hudEnabled) + "  [on]",
-				"HUD scale: " + cfg.hudScale + "  [1.0]",
-				"HUD position: " + cfg.hudCorner.name().toLowerCase(Locale.ROOT) + "  [middle_left]",
-				"HUD compact: " + onOff(cfg.hudCompact) + "  [off]"));
+		Component on = onOff(true);
+		Component off = onOff(false);
+		MutableComponent message = Texts.tr("message.villager-reroll.prefix")
+				.append(Texts.tr("command.villager-reroll.settings_header"));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_lectern",
+				cfg.lecternPosString(), Texts.tr("message.villager-reroll.pos_unset")));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_targets", cfg.targets.size()));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_close", cfg.closeDelayTicks));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_retry", cfg.retryDelayTicks));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_radius", cfg.searchRadius));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_outline", onOff(cfg.highlightVillager), on));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_pickup", onOff(cfg.autoPickup), on));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_hud", onOff(cfg.hudEnabled), on));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_scale", cfg.hudScale));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_hud_pos",
+				cornerName(cfg.hudCorner), cornerName(HudCorner.MIDDLE_LEFT)));
+		message.append("\n").append(Texts.tr("command.villager-reroll.settings_compact", onOff(cfg.hudCompact), off));
+		return say(ctx, message);
 	}
 
 	private static int debug(CommandContext<FabricClientCommandSource> ctx) {
 		Minecraft mc = ctx.getSource().getClient();
 		var player = ctx.getSource().getPlayer();
-		String hotbar = HotbarUtil.describeHotbar(player);
 		Villager selected = VillagerRerollClient.CONTROLLER.getSelectedVillager(mc.level);
-		return say(ctx, String.join("\n",
-				PREFIX + "Debug",
-				"Game mode: " + (mc.gameMode != null ? mc.gameMode.getPlayerMode().getName() : "?"),
-				"State: " + VillagerRerollClient.CONTROLLER.getState()
-						+ " - " + VillagerRerollClient.CONTROLLER.getStatusMessage(),
-				"Lectern found in: " + HotbarUtil.findLectern(player)
-						+ " (total " + HotbarUtil.countLecterns(player) + ")",
-				"Selected villager: " + (selected != null
-						? selected.getDisplayName().getString() + " at " + selected.blockPosition().toShortString()
-						: "none (nearest is used)"),
-				"Hotbar (* = selected):",
-				hotbar.isEmpty() ? "(empty)" : hotbar));
+		RerollState state = VillagerRerollClient.CONTROLLER.getState();
+		Component mode = mc.gameMode != null
+				? mc.gameMode.getPlayerMode().getLongDisplayName()
+				: Texts.tr("message.villager-reroll.unknown");
+		Component villager = selected != null
+				? Texts.tr("command.villager-reroll.debug_villager",
+				selected.getDisplayName(), selected.blockPosition().toShortString())
+				: Texts.tr("command.villager-reroll.debug_villager_none");
+		MutableComponent message = Texts.tr("message.villager-reroll.prefix")
+				.append(Texts.tr("command.villager-reroll.debug_header"));
+		message.append("\n").append(Texts.tr("command.villager-reroll.debug_mode", mode));
+		message.append("\n").append(Texts.tr("command.villager-reroll.debug_state",
+				Texts.tr("state.villager-reroll." + state.name().toLowerCase(Locale.ROOT)),
+				VillagerRerollClient.CONTROLLER.getStatusMessage()));
+		message.append("\n").append(Texts.tr("command.villager-reroll.debug_lectern",
+				HotbarUtil.locationName(HotbarUtil.findLectern(player)),
+				HotbarUtil.countLecterns(player)));
+		message.append("\n").append(villager);
+		message.append("\n").append(Texts.tr("command.villager-reroll.debug_hotbar"));
+		message.append("\n").append(HotbarUtil.describeHotbar(player));
+		return say(ctx, message);
 	}
 
-	private static int say(CommandContext<FabricClientCommandSource> ctx, String message) {
-		ctx.getSource().sendFeedback(Component.literal(message));
+	private static int say(CommandContext<FabricClientCommandSource> ctx, Component message) {
+		ctx.getSource().sendFeedback(message);
 		return 1;
 	}
 
-	private static String onOff(boolean value) {
-		return value ? "on" : "off";
+	private static Component onOff(boolean value) {
+		return Texts.tr(value ? "message.villager-reroll.on" : "message.villager-reroll.off");
+	}
+
+	private static Component cornerName(HudCorner corner) {
+		return Texts.tr("config.villager-reroll.corner." + corner.name().toLowerCase(Locale.ROOT));
 	}
 }

@@ -1,6 +1,10 @@
 # Villager Trade Reroller for Minecraft 26.3 (Fabric)
 
-A client-side Fabric mod that rerolls librarian villager trades for you. It breaks and replaces the lectern, opens the trade screen, reads the enchanted books on offer, and stops as soon as it finds the book you asked for: Mending, Unbreaking III, Protection IV, or whatever else is on your list.
+A client-side Fabric mod for Minecraft 26.3. It rerolls librarian trades by breaking and replacing the lectern, opening the trade screen, and reading the enchanted books on offer. It stops when it finds the book you asked for.
+
+It does not treat a swing or a fixed delay as a broken lectern. The next place or trade check waits until this client has the server's settled block state for that position: the break prediction has been acknowledged, the chunk is loaded, and the block there is air. If that confirmation does not arrive, the cycle stops and says why instead of placing another lectern.
+
+The GUI, HUD, status lines, errors, command replies, and keybind names are in English and Russian (`en_us` and `ru_ru`). Russian is used when the game language is Русский (Россия). English remains the fallback.
 
 This is a fork of [Villager Reroll by Joplayz](https://github.com/Joplayz/villager-reroll-26.1.2), updated to Minecraft 26.3 and reworked so it holds up in survival on a multiplayer server. The reroll loop and the idea are Joplayz's. I fixed what broke for me on a survival server and added the things I kept wishing it had.
 
@@ -9,6 +13,8 @@ This is a fork of [Villager Reroll by Joplayz](https://github.com/Joplayz/villag
 The original targets Minecraft 26.1.2 / 26.2. This version:
 
 - Runs on **Minecraft 26.3** with Fabric Loader 0.19.5 and Fabric API 0.162.0.
+- Waits for server confirmation that the chosen lectern is gone before the next place or trade check. A sent hit or a timer is not enough. Up to three break attempts, then a stop with a chat message if the break is still unconfirmed, the spot has a different block, the chunk is unloaded, or the world changes.
+- Includes a Russian translation (`assets/villager-reroll/lang/ru_ru.json`) for the screens, HUD, statuses, errors, `/reroll` replies, and keybinds. `en_us.json` stays as the fallback.
 - Finds your lectern in the hotbar, the offhand, or anywhere in your inventory. The original only checked the hotbar, so survival players who kept lecterns in the offhand or main inventory got `No lectern in hotbar!` and the mod stopped.
 - Walks over to a lectern that drops out of pickup range, picks it up, and walks back to where you were standing. It sneaks the whole way, so it won't walk you off a ledge.
 - Lets you pick the exact villager to reroll. Look at it and run `/reroll villager`, and only you will see it outlined. No more rerolling the wrong librarian in a crowded trading hall.

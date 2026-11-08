@@ -3,6 +3,7 @@ package com.joplayx.client.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.joplayx.VillagerReroll;
+import com.joplayx.client.Texts;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.BlockPos;
 
@@ -131,8 +132,8 @@ public class RerollerConfig {
          * Returns a human-readable string of the lectern position.
          */
         public String lecternPosString() {
-            if (!hasLecternPos()) return "Not set";
-            return "X: " + lecternX + "  Y: " + lecternY + "  Z: " + lecternZ;
+            if (!hasLecternPos()) return Texts.str("message.villager-reroll.pos_unset");
+            return Texts.str("message.villager-reroll.pos_coords", lecternX, lecternY, lecternZ);
         }
     }
 

@@ -2,7 +2,7 @@ package com.joplayx.client.config;
 
 import com.joplayx.client.config.RerollerConfig.Config;
 import com.joplayx.client.config.RerollerConfig.EnchantTarget;
-import net.minecraft.client.Minecraft;
+import com.joplayx.client.Texts;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -73,7 +73,7 @@ public class EnchantTargetListScreen extends Screen {
     }
 
     public EnchantTargetListScreen(Screen parent) {
-        super(Component.literal("Villager Trade Reroller"));
+        super(Texts.tr("screen.villager-reroll.title"));
         this.parent = parent;
     }
 
@@ -100,20 +100,20 @@ public class EnchantTargetListScreen extends Screen {
             y += ROW_HEIGHT;
         }
 
-        this.addRenderableWidget(Button.builder(Component.literal("+ Add Enchantment"), b -> {
+        this.addRenderableWidget(Button.builder(Texts.tr("screen.villager-reroll.add"), b -> {
             saveAll();
             RerollerConfig.get().targets.add(new EnchantTarget("", 1, 64));
             RerollerConfig.save();
             rebuild();
         }).bounds(LEFT, this.height - 58, 200, 20).build());
 
-        this.addRenderableWidget(Button.builder(Component.literal("More Settings (Lectern, Timing, Display)"), b -> {
+        this.addRenderableWidget(Button.builder(Texts.tr("screen.villager-reroll.more"), b -> {
             saveAll();
             RerollerConfig.save();
             this.minecraft.gui.setScreen(RerollerConfigScreen.create(this));
         }).bounds(LEFT, this.height - 30, 260, 20).build());
 
-        this.addRenderableWidget(Button.builder(Component.literal("Done"), b -> {
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), b -> {
             saveAll();
             RerollerConfig.save();
             this.minecraft.gui.setScreen(parent);
@@ -121,25 +121,25 @@ public class EnchantTargetListScreen extends Screen {
     }
 
     private void addRow(EnchantTarget target, int y) {
-        EditBox idBox = new EditBox(this.font, LEFT, y, ID_WIDTH, 20, Component.literal("Enchantment ID"));
+        EditBox idBox = new EditBox(this.font, LEFT, y, ID_WIDTH, 20, Texts.tr("screen.villager-reroll.enchant_id"));
         idBox.setValue(target.enchantmentId);
         idBox.setMaxLength(64);
-        idBox.setHint(Component.literal("e.g. minecraft:mending"));
+        idBox.setHint(Texts.tr("screen.villager-reroll.hint_id"));
 
         int levelX = LEFT + ID_WIDTH + GAP;
-        EditBox levelBox = new EditBox(this.font, levelX, y, LEVEL_WIDTH, 20, Component.literal("Min Level"));
+        EditBox levelBox = new EditBox(this.font, levelX, y, LEVEL_WIDTH, 20, Texts.tr("screen.villager-reroll.min_level"));
         levelBox.setValue(String.valueOf(target.minLevel));
         levelBox.setMaxLength(2);
-        levelBox.setHint(Component.literal("Lvl"));
+        levelBox.setHint(Texts.tr("screen.villager-reroll.hint_level"));
 
         int costX = levelX + LEVEL_WIDTH + GAP;
-        EditBox costBox = new EditBox(this.font, costX, y, COST_WIDTH, 20, Component.literal("Max Cost"));
+        EditBox costBox = new EditBox(this.font, costX, y, COST_WIDTH, 20, Texts.tr("screen.villager-reroll.max_cost"));
         costBox.setValue(String.valueOf(target.maxEmeraldCost));
         costBox.setMaxLength(2);
-        costBox.setHint(Component.literal("Cost"));
+        costBox.setHint(Texts.tr("screen.villager-reroll.hint_cost"));
 
         int removeX = costX + COST_WIDTH + GAP;
-        Button removeButton = Button.builder(Component.literal("Remove"), b -> {
+        Button removeButton = Button.builder(Texts.tr("screen.villager-reroll.remove"), b -> {
             saveAll();
             RerollerConfig.get().targets.remove(target);
             RerollerConfig.save();
@@ -214,19 +214,20 @@ public class EnchantTargetListScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         super.extractRenderState(graphics, mouseX, mouseY, delta);
 
-        graphics.text(this.font, this.title.getString(),
-                (this.width - this.font.width(this.title.getString())) / 2, 12, 0xFFFFAA00);
+        graphics.text(this.font, this.title,
+                (this.width - this.font.width(this.title)) / 2, 12, 0xFFFFAA00);
 
-        graphics.text(this.font, "Every enchantment below must be found together on the same villager.",
-                (this.width - this.font.width("Every enchantment below must be found together on the same villager.")) / 2,
+        Component subtitle = Texts.tr("screen.villager-reroll.subtitle");
+        graphics.text(this.font, subtitle,
+                (this.width - this.font.width(subtitle)) / 2,
                 26, 0xFFAAAAAA);
 
         if (!rows.isEmpty()) {
-            graphics.text(this.font, "Enchantment ID", LEFT, TOP - 12, 0xFFAAAAAA);
-            graphics.text(this.font, "Lvl", LEFT + ID_WIDTH + GAP, TOP - 12, 0xFFAAAAAA);
-            graphics.text(this.font, "Cost", LEFT + ID_WIDTH + GAP + LEVEL_WIDTH + GAP, TOP - 12, 0xFFAAAAAA);
+            graphics.text(this.font, Texts.tr("screen.villager-reroll.col_id"), LEFT, TOP - 12, 0xFFAAAAAA);
+            graphics.text(this.font, Texts.tr("screen.villager-reroll.col_level"), LEFT + ID_WIDTH + GAP, TOP - 12, 0xFFAAAAAA);
+            graphics.text(this.font, Texts.tr("screen.villager-reroll.col_cost"), LEFT + ID_WIDTH + GAP + LEVEL_WIDTH + GAP, TOP - 12, 0xFFAAAAAA);
         } else {
-            graphics.text(this.font, "No targets yet - click \"+ Add Enchantment\" below.",
+            graphics.text(this.font, Texts.tr("screen.villager-reroll.empty"),
                     LEFT, TOP, 0xFFAAAAAA);
         }
     }
