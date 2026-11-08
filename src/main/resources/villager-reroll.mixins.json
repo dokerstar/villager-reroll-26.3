@@ -4,7 +4,9 @@
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"MerchantOffersPacketMixin",
-		"MinecraftGlowMixin"
+		"MinecraftGlowMixin",
+		"ClientLevelAccess",
+		"PredictionLedgerAccess"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -55,6 +56,8 @@ public class TradeUtil {
         }
     }
 
+    private record SeenOffer(Holder<Enchantment> holder, String enchantmentId, int level, int cost) {}
+
     public static TradeResult checkTrades(RerollerConfig.Config cfg) {
         MerchantOffers offers = OffersStore.get();
 
@@ -66,9 +69,9 @@ public class TradeUtil {
         if (offers == null || offers.isEmpty() || mc.level == null) {
             List<TargetStatus> statuses = new ArrayList<>();
             for (RerollerConfig.EnchantTarget t : cfg.targets) {
-                statuses.add(new TargetStatus(t, false, "No trades available"));
+                statuses.add(new TargetStatus(t, false, Component.translatable("message.villager-reroll.no_trades").getString()));
             }
-            return new TradeResult(null, statuses, "No trades available");
+            return new TradeResult(null, statuses, Component.translatable("message.villager-reroll.no_trades").getString());
         }
 
         // Registry lookup — confirmed from working mod line 707
@@ -76,7 +79,6 @@ public class TradeUtil {
 
         // Single pass over every enchanted book offer, so both per-target matching
         // and the general "last offer seen" summary come from the same data.
-        record SeenOffer(String enchantmentId, int level, int cost) {}
         List<SeenOffer> seen = new ArrayList<>();
 
         for (MerchantOffer offer : offers) {
@@ -97,31 +99,31 @@ public class TradeUtil {
                 // your max would get rejected even though the actual price was fine.
                 int cost = offer.getCostA().getCount();
 
-                seen.add(new SeenOffer(enchantmentId, level, cost));
+                seen.add(new SeenOffer(enchHolder, enchantmentId, level, cost));
             }
         }
 
         String lastOfferSeen = seen.isEmpty()
-                ? "No enchanted books offered"
-                : describe(seen.get(seen.size() - 1).enchantmentId(), seen.get(seen.size() - 1).level(), seen.get(seen.size() - 1).cost());
+                ? Component.translatable("message.villager-reroll.no_books").getString()
+                : describe(seen.getLast(), false);
 
         List<TargetStatus> statuses = new ArrayList<>();
         RerollerConfig.EnchantTarget foundTarget = null;
 
         for (RerollerConfig.EnchantTarget target : cfg.targets) {
             boolean satisfied = false;
-            String description = "Not offered";
+            String description = Component.translatable("message.villager-reroll.not_offered").getString();
 
             for (SeenOffer s : seen) {
                 if (!s.enchantmentId().equals(target.enchantmentId)) continue;
-                String desc = describe(s.enchantmentId(), s.level(), s.cost());
+                String desc = describe(s, false);
 
                 if (s.level() >= target.minLevel && s.cost() <= target.maxEmeraldCost) {
                     satisfied = true;
                     description = desc;
                     break;
                 } else if (!satisfied) {
-                    description = desc + " (doesn't meet criteria)";
+                    description = describe(s, true);
                 }
             }
 
@@ -137,15 +139,11 @@ public class TradeUtil {
         return new TradeResult(foundTarget, statuses, lastOfferSeen);
     }
 
-    private static String describe(String enchantmentId, int level, int cost) {
-        return enchantmentId + " " + toRoman(level) + " for " + cost + " emeralds";
-    }
-
-    private static String toRoman(int level) {
-        return switch (level) {
-            case 1 -> "I"; case 2 -> "II"; case 3 -> "III";
-            case 4 -> "IV"; case 5 -> "V";
-            default -> String.valueOf(level);
-        };
+    private static String describe(SeenOffer offer, boolean mismatch) {
+        Component name = Enchantment.getFullname(offer.holder(), offer.level());
+        String key = mismatch
+                ? "message.villager-reroll.offer_mismatch"
+                : "message.villager-reroll.offer";
+        return Component.translatable(key, name, offer.cost()).getString();
     }
 }

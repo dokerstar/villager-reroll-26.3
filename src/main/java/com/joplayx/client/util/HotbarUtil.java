@@ -1,7 +1,9 @@
 package com.joplayx.client.util;
 
+import com.joplayx.client.Texts;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.InteractionHand;
@@ -125,23 +127,40 @@ public class HotbarUtil {
 		return (selected.getMaxDamage() - selected.getDamageValue()) <= threshold;
 	}
 
-	/** One line per non-empty hotbar slot plus the offhand, for /reroll debug. */
-	public static String describeHotbar(Player player) {
-		Inventory inv = player.getInventory();
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < Inventory.SELECTION_SIZE; i++) {
-			appendSlot(sb, "slot " + i + (i == inv.getSelectedSlot() ? "*" : ""), inv.getItem(i));
-		}
-		appendSlot(sb, "offhand", player.getOffhandItem());
-		return sb.toString();
+	public static Component locationName(LecternLocation location) {
+		return Texts.tr("location.villager-reroll." + location.name().toLowerCase(java.util.Locale.ROOT));
 	}
 
-	private static void appendSlot(StringBuilder sb, String label, ItemStack stack) {
-		if (stack.isEmpty()) return;
-		if (!sb.isEmpty()) sb.append('\n');
-		sb.append(label).append(": ")
-				.append(BuiltInRegistries.ITEM.getKey(stack.getItem()))
-				.append(" x").append(stack.getCount())
-				.append(isLectern(stack) ? "  <- lectern" : "");
+	/** One line per non-empty hotbar slot plus the offhand, for /reroll debug. */
+	public static Component describeHotbar(Player player) {
+		Inventory inv = player.getInventory();
+		Component lines = Component.empty();
+		boolean any = false;
+		for (int i = 0; i < Inventory.SELECTION_SIZE; i++) {
+			Component line = slotLine(
+					i == inv.getSelectedSlot()
+							? Texts.tr("command.villager-reroll.slot_selected", i)
+							: Texts.tr("command.villager-reroll.slot", i),
+					inv.getItem(i));
+			if (line == null) continue;
+			if (any) lines = lines.copy().append("\n");
+			lines = lines.copy().append(line);
+			any = true;
+		}
+		Component offhand = slotLine(Texts.tr("command.villager-reroll.offhand"), player.getOffhandItem());
+		if (offhand != null) {
+			if (any) lines = lines.copy().append("\n");
+			lines = lines.copy().append(offhand);
+			any = true;
+		}
+		return any ? lines : Texts.tr("command.villager-reroll.debug_empty");
+	}
+
+	private static Component slotLine(Component label, ItemStack stack) {
+		if (stack.isEmpty()) return null;
+		String key = isLectern(stack)
+				? "command.villager-reroll.debug_slot_lectern"
+				: "command.villager-reroll.debug_slot";
+		return Texts.tr(key, label, BuiltInRegistries.ITEM.getKey(stack.getItem()), stack.getCount());
 	}
 }

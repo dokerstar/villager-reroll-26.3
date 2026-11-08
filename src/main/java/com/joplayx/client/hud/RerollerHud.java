@@ -1,5 +1,6 @@
 package com.joplayx.client.hud;
 
+import com.joplayx.client.Texts;
 import com.joplayx.client.VillagerRerollClient;
 import com.joplayx.client.config.RerollerConfig;
 import com.joplayx.client.state.RerollController;
@@ -8,6 +9,7 @@ import com.joplayx.client.util.TradeUtil;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.CommonColors;
 
 import java.util.ArrayList;
@@ -74,17 +76,22 @@ public class RerollerHud {
 		String emergencyStopName = VillagerRerollClient.emergencyStopKey.getTranslatedKeyMessage().getString();
 		String setPositionName = VillagerRerollClient.setPositionKey.getTranslatedKeyMessage().getString();
 
-		String lecternPos = cfg.hasLecternPos() ? cfg.lecternPosString() : "NOT SET (" + setPositionName + ")";
+		Component lecternPos = cfg.hasLecternPos()
+				? Component.literal(cfg.lecternPosString())
+				: Texts.tr("hud.villager-reroll.lectern_unset", setPositionName);
 
-		String header = "VILLAGER REROLLER";
-		String footer = startStopName + " Start/Stop    " + emergencyStopName + " Stop    " + setPositionName + " Set Pos";
+		Component header = Texts.tr("hud.villager-reroll.title");
+		Component footer = Texts.tr("hud.villager-reroll.footer", startStopName, emergencyStopName, setPositionName);
 
 		// Fixed rows first
-		List<String> labels = new ArrayList<>(List.of("Status", "Lectern", "Attempts"));
-		List<String> values = new ArrayList<>(List.of(
-				ctrl.getStatusMessage(),
+		List<Component> labels = new ArrayList<>(List.of(
+				Texts.tr("hud.villager-reroll.status"),
+				Texts.tr("hud.villager-reroll.lectern"),
+				Texts.tr("hud.villager-reroll.attempts")));
+		List<Component> values = new ArrayList<>(List.of(
+				Component.literal(ctrl.getStatusMessage()),
 				lecternPos,
-				String.valueOf(ctrl.getAttempts())
+				Component.literal(String.valueOf(ctrl.getAttempts()))
 		));
 		List<Integer> valueColors = new ArrayList<>(List.of(
 				statusColor,
@@ -96,49 +103,53 @@ public class RerollerHud {
 		// villager's trades so multiple targets show their live found/not-found state.
 		List<TradeUtil.TargetStatus> lastStatuses = ctrl.getLastStatuses();
 		if (cfg.targets.isEmpty()) {
-			labels.add("Targets");
-			values.add("none configured");
+			labels.add(Texts.tr("hud.villager-reroll.targets"));
+			values.add(Texts.tr("hud.villager-reroll.targets_none"));
 			valueColors.add(COLOR_RED);
 		} else {
 			for (RerollerConfig.EnchantTarget target : cfg.targets) {
 				String shortId = target.enchantmentId.contains(":")
 						? target.enchantmentId.substring(target.enchantmentId.indexOf(':') + 1)
 						: target.enchantmentId;
-				if (shortId.isEmpty()) shortId = "(not set)";
+				Component label = shortId.isEmpty()
+						? Texts.tr("hud.villager-reroll.unset_enchant")
+						: Component.literal(shortId);
 
 				TradeUtil.TargetStatus match = lastStatuses.stream()
 						.filter(s -> s.target() == target)
 						.findFirst()
 						.orElse(null);
 
-				String value;
+				Component value;
 				int color;
 				if (match == null) {
 					// Not checked yet this cycle - show the criteria plainly, no "checking..."
 					// spam repeated on every row (the Status row already says what's happening).
-					value = "Lv" + target.minLevel + "+, " + target.maxEmeraldCost + "g max";
+					value = Texts.tr("hud.villager-reroll.criteria", target.minLevel, target.maxEmeraldCost);
 					color = COLOR_GRAY;
 				} else if (match.satisfied()) {
-					value = match.description();
+					value = Component.literal(match.description());
 					color = COLOR_GREEN;
 				} else {
-					value = match.description();
+					value = Component.literal(match.description());
 					color = COLOR_RED;
 				}
 
-				labels.add(shortId);
+				labels.add(label);
 				values.add(value);
 				valueColors.add(color);
 			}
 		}
 
-		labels.add("Last Offer");
-		values.add(ctrl.getLastOfferSeen().isEmpty() ? "-" : ctrl.getLastOfferSeen());
+		labels.add(Texts.tr("hud.villager-reroll.last_offer"));
+		values.add(ctrl.getLastOfferSeen().isEmpty()
+				? Texts.tr("hud.villager-reroll.none_offer")
+				: Component.literal(ctrl.getLastOfferSeen()));
 		valueColors.add(COLOR_DIM);
 
 		// --- Measure ---
 		int labelWidth = 0;
-		for (String label : labels) labelWidth = Math.max(labelWidth, mc.font.width(label));
+		for (Component label : labels) labelWidth = Math.max(labelWidth, mc.font.width(label));
 		int labelColW = labelWidth + LABEL_VALUE_GAP;
 
 		int contentWidth = Math.max(mc.font.width(header), mc.font.width(footer));
@@ -194,8 +205,8 @@ public class RerollerHud {
 	/** One-line panel: just the status and attempt count, for when the full panel is in the way. */
 	private static void extractCompact(GuiGraphicsExtractor graphics, Minecraft mc,
 									   RerollerConfig.Config cfg, RerollController ctrl, int statusColor) {
-		String label = "Reroller #" + ctrl.getAttempts() + "  ";
-		String status = ctrl.getStatusMessage();
+		Component label = Texts.tr("hud.villager-reroll.compact", ctrl.getAttempts());
+		Component status = Component.literal(ctrl.getStatusMessage());
 		int contentWidth = mc.font.width(label) + mc.font.width(status);
 		int contentHeight = LINE_HEIGHT - 1;
 

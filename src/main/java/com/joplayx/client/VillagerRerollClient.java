@@ -107,11 +107,11 @@ public class VillagerRerollClient implements ClientModInitializer {
 			}
 
 			while (setPositionKey.consumeClick()) {
-				client.player.sendSystemMessage(Component.literal(setLecternFromCrosshair(client)));
+				client.player.sendSystemMessage(setLecternFromCrosshair(client));
 			}
 
 			while (selectVillagerKey.consumeClick()) {
-				client.player.sendSystemMessage(Component.literal(selectVillagerFromCrosshair(client)));
+				client.player.sendSystemMessage(selectVillagerFromCrosshair(client));
 			}
 
 			while (openConfigKey.consumeClick()) {
@@ -140,10 +140,10 @@ public class VillagerRerollClient implements ClientModInitializer {
 	 * face (normally the air block on top of the floor), since that's where a
 	 * lectern can actually be placed.
 	 */
-	public static String setLecternFromCrosshair(Minecraft client) {
+	public static Component setLecternFromCrosshair(Minecraft client) {
 		if (client.level == null || !(client.hitResult instanceof BlockHitResult blockHit)
 				|| blockHit.getType() != HitResult.Type.BLOCK) {
-			return "[Reroller] Look at the floor where the lectern should go, then try again.";
+			return Texts.prefixed("message.villager-reroll.look_floor");
 		}
 		BlockPos hitPos = blockHit.getBlockPos();
 		BlockPos pos = client.level.getBlockState(hitPos).is(Blocks.LECTERN)
@@ -151,15 +151,15 @@ public class VillagerRerollClient implements ClientModInitializer {
 				: hitPos.relative(blockHit.getDirection());
 		RerollerConfig.get().setLecternPos(pos);
 		RerollerConfig.save();
-		return "[Reroller] Lectern position set to " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ();
+		return Texts.prefixed("message.villager-reroll.pos_set", pos.getX(), pos.getY(), pos.getZ());
 	}
 
-	public static String selectVillagerFromCrosshair(Minecraft client) {
+	public static Component selectVillagerFromCrosshair(Minecraft client) {
 		if (client.hitResult instanceof EntityHitResult entityHit
 				&& entityHit.getEntity() instanceof Villager villager) {
 			CONTROLLER.selectVillager(villager);
-			return "[Reroller] Villager selected (" + villager.getDisplayName().getString() + ").";
+			return Texts.prefixed("message.villager-reroll.villager_selected", villager.getDisplayName());
 		}
-		return "[Reroller] Look at a villager first.";
+		return Texts.prefixed("message.villager-reroll.look_villager");
 	}
 }
