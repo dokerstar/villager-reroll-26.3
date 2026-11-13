@@ -21,6 +21,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.inventory.MerchantMenu;
@@ -63,6 +64,18 @@ public class RerollController {
 	private static final int MAX_PROFESSION_WAIT = 200;
 	private int screenWaitTicks = 0;
 	private static final int MAX_SCREEN_WAIT = 100;
+	private static final int MAX_TRADE_OPENS = 3;
+	private static final int MAX_PLACE_FAILS = 3;
+	private static final int MAX_PROFESSION_MISSES = 3;
+	/** Ticks to wait for a rejected placement to settle before trying again. */
+	private static final int PLACE_SETTLE_TICKS = 40;
+	/** Survival entity-interact range. Further than this, the server ignores the click. */
+	private static final double TRADE_REACH = 3.0;
+	private final RetryBudget tradeOpens = new RetryBudget(MAX_TRADE_OPENS);
+	private final RetryBudget placeFails = new RetryBudget(MAX_PLACE_FAILS);
+	private final RetryBudget professionMisses = new RetryBudget(MAX_PROFESSION_MISSES);
+	private boolean tradeOutOfReach = false;
+	private boolean holdingMoveKeys = false;
 	private int pickupWaitTicks = 0;
 	private static final int MAX_PICKUP_WAIT = 60;
 	private static final int MIN_AXE_DURABILITY = 10;
@@ -146,6 +159,9 @@ public class RerollController {
 			stop(client, StopKind.ERROR, "reason.villager-reroll.world_changed");
 			return;
 		}
+		if (state != RerollState.WALK_TO_ITEM && state != RerollState.WALK_BACK && holdingMoveKeys) {
+			releaseMovement(client);
+		}
 
 		if (tickDelay > 0) { tickDelay--; return; }
 
@@ -193,9 +209,9 @@ public class RerollController {
 					if (hand == null) {
 						stop(client, StopKind.ERROR, "reason.villager-reroll.no_lecterns_left"); return;
 					}
-					BlockHitResult hit = new BlockHitResult(
-							Vec3.atBottomCenterOf(pos), Direction.UP, pos.below(), false
-					);
+					Vec3 click = Vec3.atBottomCenterOf(pos);
+					lookAt(player, click);
+					BlockHitResult hit = new BlockHitResult(click, Direction.UP, pos.below(), false);
 					if (client.gameMode != null) {
 						client.gameMode.useItemOn(player, hand, hit);
 					}
@@ -210,17 +226,46 @@ public class RerollController {
 				if (entity == null || !entity.isAlive()) {
 					stop(client, StopKind.ERROR, "reason.villager-reroll.villager_disappeared"); return;
 				}
+				BlockPos pos = RerollerConfig.get().lecternPos();
+				if (pos == null) {
+					stop(client, StopKind.ERROR, "reason.villager-reroll.no_pos",
+							VillagerRerollClient.setPositionKey.getTranslatedKeyMessage());
+					return;
+				}
+				LecternView placed = lecternView(level, pos);
+				boolean settledLectern = placed.kind == BlockKind.LECTERN && !placed.pending;
+				if (!settledLectern) {
+					status("status.villager-reroll.place_wait");
+					int limit = placed.pending ? LecternBreakGate.CONFIRM_GRACE_TICKS : PLACE_SETTLE_TICKS;
+					if (professionWaitTicks >= limit) {
+						if (!placeFails.allow()) {
+							stop(client, StopKind.ERROR, "reason.villager-reroll.place_failed");
+						} else {
+							professionWaitTicks = 0;
+							setState(RerollState.PLACE_LECTERN, "status.villager-reroll.placing", 10);
+						}
+					}
+					return;
+				}
+				placeFails.reset();
+				status("status.villager-reroll.wait_profession");
 
 				if (entity instanceof Villager villager) {
 					villager.getVillagerData().profession().unwrapKey().ifPresent(profKey -> {
 						if (!profKey.identifier().getPath().equals("none")) {
-							setState(RerollState.OPEN_VILLAGER, "status.villager-reroll.opening", 10);
+							professionMisses.reset();
+							tradeOpens.reset();
+							setState(RerollState.OPEN_VILLAGER, "status.villager-reroll.opening", 5);
 						}
 					});
 				}
 
 				if (state == RerollState.WAIT_FOR_PROFESSION && professionWaitTicks >= MAX_PROFESSION_WAIT) {
-					beginBreak(RerollState.BREAK_LECTERN, "status.villager-reroll.profession_timeout", 5);
+					if (!professionMisses.allow()) {
+						stop(client, StopKind.ERROR, "reason.villager-reroll.no_profession");
+					} else {
+						beginBreak(RerollState.BREAK_LECTERN, "status.villager-reroll.profession_timeout", 5);
+					}
 				}
 			}
 
@@ -229,18 +274,30 @@ public class RerollController {
 				if (entity == null || !entity.isAlive()) {
 					stop(client, StopKind.ERROR, "reason.villager-reroll.villager_disappeared"); return;
 				}
+				if (!tradeOpens.allow()) {
+					stop(client, StopKind.ERROR, tradeOutOfReach
+							? "reason.villager-reroll.too_far"
+							: "reason.villager-reroll.trade_screen");
+					return;
+				}
+				lookAt(player, entity.getEyePosition());
+				tradeOutOfReach = !withinTradeReach(player, entity);
+				if (player.containerMenu != player.inventoryMenu) player.closeContainer();
 				// Drop the previous attempt's offers so WAIT_FOR_SCREEN only accepts a fresh packet
 				OffersStore.clear();
 				screenWaitTicks = 0;
-				if (client.gameMode != null) {
-					EntityHitResult entityHit = new EntityHitResult(entity);
+				if (!tradeOutOfReach && client.gameMode != null) {
+					EntityHitResult entityHit = new EntityHitResult(entity, entity.getBoundingBox().getCenter());
 					client.gameMode.interact(player, entity, entityHit, InteractionHand.MAIN_HAND);
 				}
-				setState(RerollState.WAIT_FOR_SCREEN, "status.villager-reroll.wait_screen", 10);
+				setState(RerollState.WAIT_FOR_SCREEN,
+						tradeOutOfReach ? "status.villager-reroll.too_far" : "status.villager-reroll.wait_screen",
+						10);
 			}
 
 			case WAIT_FOR_SCREEN -> {
 				if (OffersStore.get() != null) {
+					tradeOpens.reset();
 					setState(RerollState.READ_TRADES, "status.villager-reroll.reading", 2);
 				} else if ((screenWaitTicks += 5) >= MAX_SCREEN_WAIT) {
 					setState(RerollState.OPEN_VILLAGER, "status.villager-reroll.no_screen", 5);
@@ -317,6 +374,11 @@ public class RerollController {
 			}
 
 			case WALK_TO_ITEM -> {
+				if (stuckCrawling(player)) {
+					releaseMovement(client);
+					stop(client, StopKind.ERROR, "reason.villager-reroll.stuck_crawl");
+					return;
+				}
 				if (HotbarUtil.findLectern(player) != HotbarUtil.LecternLocation.NONE) {
 					walkTicks = 0;
 					setState(RerollState.WALK_BACK, "status.villager-reroll.walking_back", 0);
@@ -342,6 +404,11 @@ public class RerollController {
 			}
 
 			case WALK_BACK -> {
+				if (stuckCrawling(player)) {
+					releaseMovement(client);
+					stop(client, StopKind.ERROR, "reason.villager-reroll.stuck_crawl");
+					return;
+				}
 				if (++walkTicks > MAX_WALK_TICKS) {
 					releaseMovement(client);
 					stop(client, StopKind.ERROR, "reason.villager-reroll.walk_back_failed");
@@ -451,6 +518,10 @@ public class RerollController {
 		lastStatuses = List.of();
 		targetEntityId = -1;
 		breakGate.reset();
+		tradeOpens.reset();
+		placeFails.reset();
+		professionMisses.reset();
+		tradeOutOfReach = false;
 		swungAttempt = -1;
 		sessionLevel = client.level;
 		OffersStore.clear();
@@ -461,7 +532,7 @@ public class RerollController {
 	}
 
 	private void stop(Minecraft client, StopKind kind, String key, Object... args) {
-		if (state == RerollState.WALK_TO_ITEM || state == RerollState.WALK_BACK) releaseMovement(client);
+		releaseMovement(client);
 		if (client.gameMode != null) client.gameMode.stopDestroyBlock();
 		breakGate.reset();
 		swungAttempt = -1;
@@ -515,6 +586,46 @@ public class RerollController {
 	 * Sneaking keeps the walk slow enough to stop on the spot and stops the player
 	 * from walking off ledges. Returns true once within tolerance (horizontally).
 	 */
+	private record LecternView(BlockKind kind, boolean pending) {}
+
+	private LecternView lecternView(ClientLevel level, BlockPos pos) {
+		BlockKind kind = classify(level, pos);
+		boolean pending = kind != BlockKind.UNLOADED && PredictionLedger.isPending(level, pos);
+		return new LecternView(kind, pending);
+	}
+
+	/** Aim the player at the villager so the server accepts the interact. */
+	private static void lookAt(LocalPlayer player, Vec3 aim) {
+		Vec3 eye = player.getEyePosition();
+		double dx = aim.x - eye.x;
+		double dy = aim.y - eye.y;
+		double dz = aim.z - eye.z;
+		double horizontal = Math.sqrt(dx * dx + dz * dz);
+		float yaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+		float pitch = (float) -Math.toDegrees(Math.atan2(dy, horizontal));
+		player.setYRot(yaw);
+		player.setYHeadRot(yaw);
+		player.setXRot(pitch);
+	}
+
+	private static boolean withinTradeReach(LocalPlayer player, Entity villager) {
+		Vec3 eye = player.getEyePosition();
+		AABB box = villager.getBoundingBox();
+		double dx = eye.x - clamp(eye.x, box.minX, box.maxX);
+		double dy = eye.y - clamp(eye.y, box.minY, box.maxY);
+		double dz = eye.z - clamp(eye.z, box.minZ, box.maxZ);
+		return dx * dx + dy * dy + dz * dz <= TRADE_REACH * TRADE_REACH;
+	}
+
+	private static double clamp(double value, double min, double max) {
+		return Math.max(min, Math.min(max, value));
+	}
+
+	/** Sneaking inside a one-block gap puts the player into crawl, and a held sneak key keeps them there. */
+	private static boolean stuckCrawling(LocalPlayer player) {
+		return player.getPose() == Pose.SWIMMING && !player.isInWater() && !player.isInLava();
+	}
+
 	private boolean walkToward(Minecraft client, LocalPlayer player, Vec3 target, double tolerance) {
 		double dx = target.x - player.getX();
 		double dz = target.z - player.getZ();
@@ -526,12 +637,16 @@ public class RerollController {
 		player.setYHeadRot(yaw);
 		client.options.keyUp.setDown(true);
 		client.options.keyShift.setDown(true);
+		holdingMoveKeys = true;
 		return false;
 	}
 
 	private void releaseMovement(Minecraft client) {
-		client.options.keyUp.setDown(false);
-		client.options.keyShift.setDown(false);
+		holdingMoveKeys = false;
+		if (client.options != null) {
+			client.options.keyUp.setDown(false);
+			client.options.keyShift.setDown(false);
+		}
 	}
 
 	private Villager findNearestVillager(LocalPlayer player, ClientLevel level) {
